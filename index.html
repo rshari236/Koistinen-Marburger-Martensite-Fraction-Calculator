@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Predict martensite fraction on quenching with the Koistinen–Marburger equation, using Ms and kinetics estimated from steel composition.">
+<title>Koistinen–Marburger Calculator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=IBM+Plex+Mono:wght@400;500;600&family=Source+Sans+3:wght@400;600&display=swap">
+<style>
+/* Layout: a lab-notebook bench — inputs on the left, the transformation curve and result on the right; blue = martensite, amber = austenite */
+:root{
+  --bg:#eceff3; --surface:#fbfcfd; --ink:#14202b; --muted:#566370; --line:#cdd5dd;
+  --mart:#2443a0; --mart-soft:rgba(36,67,160,.12); --aus:#b85d17; --aus-soft:rgba(184,93,23,.12);
+  --display:"Archivo",ui-sans-serif,system-ui,sans-serif;
+  --body:"Source Sans 3",ui-sans-serif,system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0e141a; --surface:#16202a; --ink:#e5ebf0; --muted:#93a1ae; --line:#2a3744;
+  --mart:#8aa4f7; --mart-soft:rgba(138,164,247,.14); --aus:#e9a764; --aus-soft:rgba(233,167,100,.14); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e141a; --surface:#16202a; --ink:#e5ebf0; --muted:#93a1ae; --line:#2a3744;
+  --mart:#8aa4f7; --mart-soft:rgba(138,164,247,.14); --aus:#e9a764; --aus-soft:rgba(233,167,100,.14); color-scheme:dark}
+
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:28px 48px}
+.wrap{max-width:1180px;margin:0 auto;display:grid;gap:28px}
+header{display:grid;gap:10px}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+h1{font-family:var(--display);font-stretch:118%;font-weight:750;font-size:clamp(28px,4.6vw,46px);line-height:1.04;margin:0;text-wrap:balance;letter-spacing:-.01em}
+.eq{font-family:var(--mono);font-size:clamp(15px,2.2vw,19px);color:var(--ink);overflow-x:auto;white-space:nowrap;padding-block:4px}
+.eq var{font-style:italic}
+.eq sub{font-size:.72em}
+.lede{color:var(--muted);max-width:68ch;margin:0}
+
+.grid{display:grid;grid-template-columns:minmax(0,360px) minmax(0,1fr);gap:28px;align-items:start}
+@media (max-width:880px){.grid{grid-template-columns:minmax(0,1fr)}}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:20px;display:grid;gap:22px}
+fieldset{border:0;margin:0;padding:0;display:grid;gap:12px;min-width:0}
+legend{font-family:var(--display);font-stretch:110%;font-weight:700;font-size:15px;padding:0;margin-bottom:10px}
+
+select{width:100%;font:500 14.5px var(--body);color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px 8px}
+select:focus-visible{outline:2px solid var(--mart);outline-offset:1px}
+
+.comp{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+@media (max-width:380px){.comp{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.field{display:grid;gap:3px;min-width:0}
+.field label{font-family:var(--mono);font-size:12px;color:var(--muted);display:flex;justify-content:space-between;gap:4px}
+.field label b{color:var(--ink);font-weight:600}
+.field .tag{font-size:10.5px;letter-spacing:.04em;text-transform:uppercase}
+.field.off input{opacity:.5}
+.field.off label b{color:var(--muted)}
+.field.on .tag{color:var(--mart)}
+input[type=number]{width:100%;font:500 15px var(--mono);font-variant-numeric:tabular-nums;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:7px 8px}
+input[type=number]:focus-visible{outline:2px solid var(--mart);outline-offset:1px;border-color:transparent}
+input[type=number][readonly]{background:transparent;border-style:dashed}
+.hint{font-size:13px;color:var(--muted);margin:0}
+.hint b{color:var(--ink);font-weight:600}
+.row2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+input[type=range]{width:100%;accent-color:var(--mart)}
+.bal{font-family:var(--mono);font-size:13px;color:var(--muted)}
+.bal b{color:var(--ink);font-weight:600}
+
+.main{display:grid;gap:22px;min-width:0}
+.readout{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;border-top:2px solid var(--ink);border-bottom:1px solid var(--line)}
+@media (max-width:620px){.readout{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.cell{padding:14px 14px 14px 0;display:grid;gap:2px;min-width:0}
+.cell+.cell{padding-left:14px;border-left:1px solid var(--line)}
+@media (max-width:620px){.cell:nth-child(3){padding-left:0;border-left:0}.cell:nth-child(n+3){border-top:1px solid var(--line)}}
+.cell .k{font-family:var(--mono);font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.cell .v{font-family:var(--display);font-stretch:105%;font-weight:700;font-size:clamp(24px,3.4vw,34px);font-variant-numeric:tabular-nums;line-height:1.1}
+.cell .u{font-family:var(--mono);font-size:12.5px;color:var(--muted)}
+.cell.m .v{color:var(--mart)} .cell.a .v{color:var(--aus)}
+
+.chartbox{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 10px 6px}
+.chartbox svg{display:block;width:100%;height:auto}
+.chartbox text{font-family:var(--mono);font-size:11.5px;fill:var(--muted)}
+.legend{display:flex;flex-wrap:wrap;gap:16px;padding:4px 8px 8px;font-size:13px;color:var(--muted)}
+.legend i{display:inline-block;width:14px;height:3px;border-radius:2px;vertical-align:middle;margin-right:6px}
+
+.lower{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:28px}
+@media (max-width:760px){.lower{grid-template-columns:minmax(0,1fr)}}
+h2{font-family:var(--display);font-stretch:110%;font-weight:700;font-size:17px;margin:0 0 10px}
+.tbl{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+th,td{text-align:right;padding:7px 10px;border-bottom:1px solid var(--line);font-family:var(--mono);font-size:13.5px}
+th{font-weight:500;color:var(--muted);font-size:11.5px;letter-spacing:.06em;text-transform:uppercase}
+th:first-child,td:first-child{text-align:left}
+td.ig{color:var(--muted);font-size:12px;text-align:left;white-space:normal}
+tr.hit td{color:var(--mart);font-weight:600}
+tr.hit td.ig{font-weight:400}
+.notes{font-size:14.5px;color:var(--muted);display:grid;gap:8px}
+.notes p{margin:0;max-width:65ch}
+.refs{font-size:13px;color:var(--muted);border-top:1px solid var(--line);padding-top:14px;display:grid;gap:4px}
+.refs p{margin:0}
+.warn{color:var(--aus);font-weight:600}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Athermal martensite · fraction on quenching</div>
+    <h1>Koistinen–Marburger Calculator</h1>
+    <div class="eq" aria-label="f M equals f gamma zero times 1 minus exp of minus alpha times Ms minus T to the power n">
+      <var>f</var><sub>M</sub> = <var>f</var><sub>γ,0</sub> · [ 1 − exp( −<var>α</var> · (<var>M</var><sub>s</sub> − <var>T</var><sub>q</sub>)<sup><var>n</var></sup> ) ] ,&nbsp; <var>T</var><sub>q</sub> &lt; <var>M</var><sub>s</sub> ,&nbsp; <var>n</var> = 1 in the original K–M
+    </div>
+    <p class="lede">Enter the steel composition, choose how M<sub>s</sub> and the kinetics are estimated, then pick a quench temperature. Elements a chosen model does not use are dimmed, so you can see what each estimate actually accounts for.</p>
+  </header>
+
+  <div class="grid">
+    <form class="panel" id="form" autocomplete="off">
+      <fieldset>
+        <legend>Composition, wt%</legend>
+        <div class="comp" id="comp"></div>
+        <div class="bal" id="bal"></div>
+        <p class="hint" id="usehint"></p>
+      </fieldset>
+
+      <fieldset>
+        <legend>Martensite start, M<sub>s</sub></legend>
+        <label class="hint" for="msm">Model</label>
+        <select id="msm"></select>
+        <div class="field"><label for="ms"><span>M<sub>s</sub>, °C</span></label><input type="number" id="ms" step="1" value="317"></div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Kinetics, α and n</legend>
+        <label class="hint" for="am">Model</label>
+        <select id="am"></select>
+        <div class="row2">
+          <div class="field"><label for="alpha"><span>α, K⁻ⁿ</span></label><input type="number" id="alpha" step="0.0005" min="0.0001" max="0.1" value="0.011"></div>
+          <div class="field"><label for="nexp"><span>n</span></label><input type="number" id="nexp" step="0.01" min="0.3" max="3" value="1.00"></div>
+        </div>
+        <p class="hint" id="kinhint"></p>
+      </fieldset>
+
+      <fieldset>
+        <legend>Quench</legend>
+        <div class="row2">
+          <div class="field"><label for="tq"><span>T<sub>q</sub>, °C</span></label><input type="number" id="tq" step="1" value="25"></div>
+          <div class="field"><label for="fg"><span>f<sub>γ,0</sub> before quench</span></label><input type="number" id="fg" step="0.01" min="0" max="1" value="1.00"></div>
+        </div>
+        <input type="range" id="tqr" min="-196" max="500" step="1" value="25" aria-label="Quench temperature slider">
+        <p class="hint">Use f<sub>γ,0</sub> &lt; 1 when ferrite or bainite formed before the quench (intercritical anneal, partial austempering).</p>
+      </fieldset>
+    </form>
+
+    <section class="main" aria-live="polite">
+      <div class="readout">
+        <div class="cell m"><span class="k">Martensite</span><span class="v" id="o-fm">–</span><span class="u">volume fraction</span></div>
+        <div class="cell a"><span class="k">Untransformed γ</span><span class="v" id="o-fa">–</span><span class="u">retained at T<sub>q</sub></span></div>
+        <div class="cell"><span class="k">M<sub>s</sub></span><span class="v" id="o-ms">–</span><span class="u" id="o-msu">°C</span></div>
+        <div class="cell"><span class="k">α</span><span class="v" id="o-al">–</span><span class="u" id="o-alu">× 10⁻³ K⁻¹</span></div>
+      </div>
+
+      <div class="chartbox">
+        <svg id="chart" viewBox="0 0 680 380" role="img" aria-label="Martensite fraction versus temperature"></svg>
+        <div class="legend">
+          <span><i style="background:var(--mart)"></i>Martensite fraction</span>
+          <span><i style="background:var(--aus)"></i>Austenite remaining</span>
+        </div>
+      </div>
+
+      <div class="lower">
+        <div>
+          <h2>Quench temperature for a target fraction</h2>
+          <div class="tbl"><table>
+            <thead><tr><th>Target f<sub>M</sub></th><th>T<sub>q</sub>, °C</th><th>M<sub>s</sub> − T<sub>q</sub>, K</th></tr></thead>
+            <tbody id="tbody"></tbody>
+          </table></div>
+          <p class="hint" style="margin-top:8px">T<sub>q</sub> = M<sub>s</sub> − { ln[1/(1 − f<sub>M</sub>/f<sub>γ,0</sub>)] / α }<sup>1/n</sup>. The 99% row is a practical M<sub>f</sub>.</p>
+        </div>
+        <div>
+          <h2>M<sub>s</sub> from every model</h2>
+          <div class="tbl"><table>
+            <thead><tr><th>Model</th><th>M<sub>s</sub>, °C</th><th style="text-align:left">Ignores (non-zero)</th></tr></thead>
+            <tbody id="mstab"></tbody>
+          </table></div>
+          <p class="hint" style="margin-top:8px">The spread between models is a fair measure of the uncertainty in any single M<sub>s</sub> estimate.</p>
+        </div>
+      </div>
+
+      <div class="notes">
+        <h2>Reading the result</h2>
+        <p>K–M treats martensite as athermal: the fraction depends only on undercooling below M<sub>s</sub>, not on holding time.</p>
+        <p>The original α = 0.011 K⁻¹ came from high-carbon steels near 1 wt% C. Lower-carbon steels transform faster per kelvin, which the van Bohemen–Sietsma α captures. Lee &amp; Van Tyne also fit an exponent n, so the curve is no longer a pure exponential; their fit covers 0.2–1.2 C, ≤2.1 Ni, ≤1.2 Cr, ≤0.3 Mo with about 0.75 Mn and 0.25 Si.</p>
+        <p>For Q&amp;P, this gives the primary martensite at T<sub>q</sub>. Fresh martensite on the final quench needs the carbon-enriched austenite's own M<sub>s</sub>, which this page does not compute.</p>
+        <p>Composition-based M<sub>s</sub> ignores prior austenite grain size, which lowers M<sub>s</sub> in fine-grained or nanostructured austenite. Nb, Ti and V are usually tied up in carbonitrides, so enter only the amount in solution if you know it.</p>
+      </div>
+
+      <div class="refs">
+        <p>Koistinen D.P., Marburger R.E., <i>Acta Metall.</i> 7 (1959) 59–60.</p>
+        <p>Steven W., Haynes A.G., <i>J. Iron Steel Inst.</i> 183 (1956) 349. · Andrews K.W., <i>J. Iron Steel Inst.</i> 203 (1965) 721. · Kung C.Y., Rayment J.J., <i>Metall. Trans. A</i> 13 (1982) 328. · Ishida K., <i>J. Alloys Compd.</i> 220 (1995) 126. · Capdevila C., Caballero F.G., García de Andrés C., <i>ISIJ Int.</i> 42 (2002) 894. · van Bohemen S.M.C., <i>Mater. Sci. Technol.</i> 28 (2012) 487. · Barbier D., <i>Adv. Eng. Mater.</i> 16 (2014) 122 (terms as compiled by Lu et al., <i>Sci. Technol. Adv. Mater.</i> 25 (2024) 2354655). · Kaar S. et al., 2021.</p>
+        <p>Kinetics: van Bohemen S.M.C., Sietsma J., <i>Mater. Sci. Technol.</i> 25 (2009) 1009. · Lee S.-J., Van Tyne C.J., <i>Metall. Mater. Trans. A</i> 43 (2012) 422.</p>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script>
+(function(){
+  const $ = id => document.getElementById(id);
+  const num = (id, d=0) => { const v = parseFloat($(id).value); return isFinite(v) ? v : d; };
+  const fmtPct = f => (f*100).toFixed(1) + '%';
+
+  // element list with example composition (0.4C–1.5Mn–1.5Si Q&P-type steel)
+  const ELS = [
+    ['C',0.40,0.01],['N',0,0.005],['Mn',1.50,0.05],['Si',1.50,0.05],
+    ['Cr',0.50,0.05],['Ni',0,0.05],['Mo',0.20,0.05],['W',0,0.05],
+    ['V',0,0.01],['Co',0,0.05],['Cu',0,0.05],['Al',0,0.05],
+    ['Nb',0,0.005],['Ti',0,0.005]
+  ];
+  $('comp').innerHTML = ELS.map(([e,v,s]) =>
+    `<div class="field" id="f-${e}"><label for="el-${e}"><b>${e}</b><span class="tag"></span></label><input type="number" id="el-${e}" step="${s}" min="0" max="30" value="${v.toFixed(s<0.01?3:2)}"></div>`).join('');
+
+  const E = x => (k) => x[k] || 0;
+
+  // Ms models, all in °C, wt%
+  const MS = {
+    andrews:{name:'Andrews (1965), linear', uses:['C','Mn','Cr','Ni','Mo'],
+      f:x=>539 - 423*x.C - 30.4*x.Mn - 12.1*x.Cr - 17.7*x.Ni - 7.5*x.Mo},
+    steven:{name:'Steven & Haynes (1956)', uses:['C','Mn','Cr','Ni','Mo'],
+      f:x=>561 - 474*x.C - 33*x.Mn - 17*x.Cr - 17*x.Ni - 21*x.Mo},
+    kung:{name:'Kung & Rayment (1982)', uses:['C','Mn','Si','Cr','Ni','Mo','Co'],
+      f:x=>539 - 423*x.C - 30.4*x.Mn - 7.5*x.Si - 12.1*x.Cr - 17.7*x.Ni - 7.5*x.Mo + 10*x.Co},
+    ishida:{name:'Ishida (1995)', uses:['C','Mn','Si','Cr','Ni','Mo','Cu','Al','Co','Nb','Ti','V'],
+      f:x=>545 - 330*x.C - 23*x.Mn - 7*x.Si - 14*x.Cr - 13*x.Ni - 13*x.Cu - 5*x.Mo + 2*x.Al + 7*x.Co - 4*x.Nb + 3*x.Ti + 4*x.V},
+    capdevila:{name:'Capdevila et al. (2002)', uses:['C','Mn','Si','Cr','Ni','Mo','W','Cu','Co'],
+      f:x=>491.05 - 302.6*x.C - 30.6*x.Mn - 14.5*x.Si - 8.9*x.Cr - 16.6*x.Ni + 2.4*x.Mo + 7.4*x.W - 11.3*x.Cu + 8.58*x.Co},
+    vb:{name:'van Bohemen (2012)', uses:['C','Mn','Si','Cr','Ni','Mo'],
+      f:x=>565 - 600*(1 - Math.exp(-0.96*x.C)) - 31*x.Mn - 13*x.Si - 10*x.Cr - 18*x.Ni - 12*x.Mo},
+    barbier:{name:'Barbier (2014)', uses:['C','Mn','Si','Cr','Ni','Mo','V','Co','Cu'],
+      f:x=>545 - 601.2*(1 - Math.exp(-0.868*x.C)) - 34.4*x.Mn - 13.7*x.Si - 17.3*x.Ni - 9.2*x.Cr - 15.4*x.Mo + 10.8*x.V + 4.7*x.Co - 16.3*x.Cu},
+    kaar:{name:'Kaar et al. (2021)', uses:['C','N','Mn','Si','Cr','Al'],
+      f:x=>692 - 37*x.Mn - 14*x.Si + 20*x.Al - 11*x.Cr - 502*Math.sqrt(Math.max(0, x.C + 0.86*x.N))},
+    manual:{name:'Manual entry', uses:[]}
+  };
+  // kinetics models: alpha (per K^n) and n
+  const KIN = {
+    km:{name:'Koistinen–Marburger, α = 0.011', uses:[], f:x=>({a:0.011,n:1})},
+    vbs:{name:'van Bohemen & Sietsma (2009)', uses:['C','Mn','Si','Cr','Ni','Mo'],
+      f:x=>({a:(27.2 - (0.14*x.Mn + 0.21*x.Si + 0.11*x.Cr + 0.08*x.Ni + 0.05*x.Mo) - 19.8*(1 - Math.exp(-1.56*x.C)))/1000, n:1})},
+    lvt:{name:'Lee & Van Tyne (2012), with n', uses:['C','Ni','Cr','Mo'],
+      f:x=>({a:0.0231 - 0.0105*x.C - 0.0017*x.Ni + 0.0074*x.Cr - 0.0193*x.Mo,
+             n:1.4304 - 1.1836*x.C + 0.7527*x.C*x.C - 0.0258*x.Ni - 0.0739*x.Cr + 0.3108*x.Mo})},
+    manual:{name:'Manual entry', uses:[]}
+  };
+  const fillSel = (id, obj, def) => { $(id).innerHTML = Object.entries(obj).map(([k,m])=>`<option value="${k}"${k===def?' selected':''}>${m.name}</option>`).join(''); };
+  fillSel('msm', MS, 'andrews'); fillSel('am', KIN, 'km');
+
+  function comp(){ const x={}; ELS.forEach(([e])=>{ x[e] = Math.max(0, num('el-'+e)); }); return x; }
+
+  function niceStep(span, target){
+    const raw = span/target, p = Math.pow(10, Math.floor(Math.log10(raw))), m = raw/p;
+    return (m<1.5?1:m<3?2:m<7?5:10)*p;
+  }
+
+  function update(){
+    const x = comp();
+    const msKey = $('msm').value, kKey = $('am').value;
+    const msM = MS[msKey], kM = KIN[kKey];
+
+    if (msKey !== 'manual') $('ms').value = Math.round(msM.f(x));
+    $('ms').readOnly = msKey !== 'manual';
+    if (kKey !== 'manual'){ const r = kM.f(x); $('alpha').value = r.a.toFixed(4); $('nexp').value = r.n.toFixed(3); }
+    $('alpha').readOnly = $('nexp').readOnly = kKey !== 'manual';
+
+    // element usage
+    const used = new Set([...msM.uses, ...kM.uses]);
+    ELS.forEach(([e])=>{
+      const f = $('f-'+e), on = used.has(e);
+      f.classList.toggle('on', on); f.classList.toggle('off', !on);
+      f.querySelector('.tag').textContent = on ? (msM.uses.includes(e) && kM.uses.includes(e) ? 'Ms·α' : msM.uses.includes(e) ? 'Ms' : 'α') : '';
+    });
+    const ignored = ELS.map(e=>e[0]).filter(e=>x[e]>0 && !used.has(e));
+    $('usehint').innerHTML = msKey==='manual' && !kM.uses.length ? 'Composition is not used: M<sub>s</sub> and α are entered by hand.'
+      : ignored.length ? `<span class="warn">Ignored by the selected models:</span> <b>${ignored.join(', ')}</b>. Pick a model that includes them, e.g. Ishida for Al, Nb, Ti, V.`
+      : 'Every non-zero element is used by the selected models.';
+    const sum = ELS.reduce((s,[e])=>s+x[e],0);
+    $('bal').innerHTML = `Fe (balance) <b>${(100-sum).toFixed(2)}</b> wt%` + (sum>=100?' <span class="warn">— alloying exceeds 100%</span>':'');
+
+    const Ms = num('ms', 300);
+    const a = Math.max(1e-5, num('alpha', 0.011));
+    const n = Math.min(3, Math.max(0.3, num('nexp', 1)));
+    const fg = Math.min(1, Math.max(0, num('fg', 1)));
+    const Tq = num('tq', 25);
+    const fm = T => T >= Ms ? 0 : fg*(1 - Math.exp(-a*Math.pow(Ms - T, n)));
+
+    $('kinhint').innerHTML = kKey==='lvt'
+      ? (x.C<0.2||x.C>1.2||x.Ni>2.1||x.Cr>1.2||x.Mo>0.3 ? '<span class="warn">Composition is outside the Lee &amp; Van Tyne fitting range.</span> ' : '') + 'Units of α are K⁻ⁿ.'
+      : kKey==='vbs' ? 'α in K⁻¹, n fixed at 1.'
+      : kKey==='km' ? 'Original constant, n fixed at 1.' : 'Set n = 1 for the classic exponential form.';
+
+    const f = fm(Tq);
+    $('o-fm').textContent = fmtPct(f);
+    $('o-fa').textContent = fmtPct(fg - f);
+    $('o-ms').textContent = Math.round(Ms);
+    $('o-msu').textContent = '°C · ' + msM.name.replace(/ \(.*$/,'').replace(', linear','');
+    $('o-al').textContent = (a*1000).toFixed(1);
+    $('o-alu').textContent = Math.abs(n-1) < 0.0005 ? '× 10⁻³ K⁻¹' : `× 10⁻³ K⁻ⁿ · n = ${n.toFixed(2)}`;
+
+    // target table
+    const targets = [0.10,0.25,0.50,0.75,0.90,0.95,0.99];
+    let nearest = -1, best = 1e9;
+    targets.forEach((t,i)=>{ const d = Math.abs(t*fg - f); if (d<best){best=d;nearest=i;} });
+    $('tbody').innerHTML = targets.map((t,i)=>{
+      const dT = Math.pow(Math.log(1/(1-t))/a, 1/n), T = Ms - dT;
+      return `<tr class="${i===nearest && f>0 ? 'hit':''}"><td>${(t*100).toFixed(0)}% of γ → ${(t*fg*100).toFixed(1)}%</td><td>${T<-273?'<span class="warn">below 0 K</span>':Math.round(T)}</td><td>${Math.round(dT)}</td></tr>`;
+    }).join('');
+
+    // Ms comparison table
+    $('mstab').innerHTML = Object.entries(MS).filter(([k])=>k!=='manual').map(([k,m])=>{
+      const ig = ELS.map(e=>e[0]).filter(e=>x[e]>0 && !m.uses.includes(e));
+      return `<tr class="${k===msKey?'hit':''}"><td>${m.name}</td><td>${Math.round(m.f(x))}</td><td class="ig">${ig.length?ig.join(', '):'—'}</td></tr>`;
+    }).join('');
+
+    draw(Ms, a, n, fg, Tq, fm);
+  }
+
+  function draw(Ms, a, n, fg, Tq, fm){
+    const W=680,H=380,L=56,R=20,T=18,B=52, pw=W-L-R, ph=H-T-B;
+    let Thi = Math.max(Ms + 40, Tq + 20);
+    let Tlo = Math.max(-273, Math.min(Tq - 30, Ms - Math.pow(Math.log(200)/a, 1/n)));
+    const st = niceStep(Thi - Tlo, 7);
+    Thi = Math.ceil(Thi/st)*st; Tlo = Math.max(-273, Math.floor(Tlo/st)*st);
+    const xs = t => L + (Thi - t)/(Thi - Tlo)*pw;   // cooling runs left → right
+    const ys = v => T + (1 - v)*ph;
+    let s = '';
+    for (let v=0; v<=1.0001; v+=0.2){
+      const y = ys(v);
+      s += `<line x1="${L}" x2="${W-R}" y1="${y}" y2="${y}" stroke="var(--line)" stroke-width="1"/>`;
+      s += `<text x="${L-8}" y="${y+4}" text-anchor="end">${v.toFixed(1)}</text>`;
+    }
+    for (let t=Thi; t>=Tlo-1e-6; t-=st){
+      const x = xs(t);
+      s += `<line x1="${x}" x2="${x}" y1="${T+ph}" y2="${T+ph+5}" stroke="var(--muted)"/>`;
+      s += `<text x="${x}" y="${T+ph+19}" text-anchor="middle">${Math.round(t)}</text>`;
+    }
+    s += `<text x="${L+pw/2}" y="${H-8}" text-anchor="middle">Temperature, °C  (cooling →)</text>`;
+    s += `<text transform="translate(14 ${T+ph/2}) rotate(-90)" text-anchor="middle">Volume fraction</text>`;
+
+    const N=220; let pm='', pa='';
+    for (let i=0;i<=N;i++){
+      const t = Thi - (Thi-Tlo)*i/N, v = fm(t);
+      pm += (i?'L':'M') + xs(t).toFixed(1) + ' ' + ys(v).toFixed(1);
+      pa += (i?'L':'M') + xs(t).toFixed(1) + ' ' + ys(fg - v).toFixed(1);
+    }
+    if (Tq < Ms){
+      const tEnd = Math.max(Tq, Tlo); let area = `M${xs(Ms)} ${ys(0)}`;
+      for (let i=0;i<=80;i++){ const t = Ms - (Ms - tEnd)*i/80; area += `L${xs(t).toFixed(1)} ${ys(fm(t)).toFixed(1)}`; }
+      area += `L${xs(tEnd)} ${ys(0)}Z`;
+      s += `<path d="${area}" fill="var(--mart-soft)" stroke="none"/>`;
+    }
+    s += `<path d="${pa}" fill="none" stroke="var(--aus)" stroke-width="2" stroke-dasharray="5 4"/>`;
+    s += `<path d="${pm}" fill="none" stroke="var(--mart)" stroke-width="2.6" stroke-linejoin="round"/>`;
+
+    if (Ms <= Thi && Ms >= Tlo){
+      const x = xs(Ms);
+      s += `<line x1="${x}" x2="${x}" y1="${T}" y2="${T+ph}" stroke="var(--ink)" stroke-width="1" stroke-dasharray="2 3" opacity=".6"/>`;
+      s += `<text x="${x+6}" y="${T+12}" style="fill:var(--ink)">Ms ${Math.round(Ms)} °C</text>`;
+    }
+    if (Tq <= Thi && Tq >= Tlo){
+      const x = xs(Tq), v = fm(Tq), y = ys(v);
+      s += `<line x1="${x}" x2="${x}" y1="${y}" y2="${T+ph}" stroke="var(--mart)" stroke-width="1"/>`;
+      s += `<line x1="${L}" x2="${x}" y1="${y}" y2="${y}" stroke="var(--mart)" stroke-width="1" opacity=".5"/>`;
+      s += `<circle cx="${x}" cy="${y}" r="5" fill="var(--surface)" stroke="var(--mart)" stroke-width="2.4"/>`;
+      const right = x < L + pw*0.62;
+      const ly = Math.min(Math.max(y + (v>0.85? 22 : -12), T+14), T+ph-10);
+      s += `<text x="${right? x+10 : x-10}" y="${ly}" text-anchor="${right?'start':'end'}" style="fill:var(--mart);font-weight:600">Tq ${Math.round(Tq)} °C → ${(v*100).toFixed(1)}%</text>`;
+    }
+    s += `<line x1="${L}" x2="${W-R}" y1="${T+ph}" y2="${T+ph}" stroke="var(--muted)"/>`;
+    $('chart').innerHTML = s;
+  }
+
+  const form = $('form');
+  form.addEventListener('submit', e => e.preventDefault());
+  form.addEventListener('input', e => {
+    if (e.target.id === 'tqr') $('tq').value = e.target.value;
+    if (e.target.id === 'tq') $('tqr').value = e.target.value;
+    update();
+  });
+  form.addEventListener('change', update);
+  // typing into a computed field switches that model to manual
+  ['ms','alpha','nexp'].forEach(id => $(id).addEventListener('keydown', ev => {
+    if (!$(id).readOnly || ev.key==='Tab' || ev.key.startsWith('Arrow')) return;
+    $(id).readOnly = false;
+    $(id==='ms' ? 'msm' : 'am').value = 'manual';
+    if (id!=='ms') { $('alpha').readOnly = $('nexp').readOnly = false; }
+  }));
+  update();
+})();
+</script>
+
+<footer style="max-width:1180px;margin:32px auto 0;font-size:13px;color:var(--muted)">Built by Sri Hari R · B.Tech, Minerals and Metallurgical Engineering, IIT (ISM) Dhanbad</footer>
+</body>
+</html>
